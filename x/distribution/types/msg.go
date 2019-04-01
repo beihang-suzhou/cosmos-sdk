@@ -24,6 +24,7 @@ func NewMsgSetWithdrawAddress(delAddr, withdrawAddr sdk.AccAddress) MsgSetWithdr
 	}
 }
 
+func (msg MsgSetWithdrawAddress) Group() int32  { return 0 }
 func (msg MsgSetWithdrawAddress) Route() string { return MsgRoute }
 func (msg MsgSetWithdrawAddress) Type() string  { return "set_withdraw_address" }
 
@@ -62,6 +63,7 @@ func NewMsgWithdrawDelegatorReward(delAddr sdk.AccAddress, valAddr sdk.ValAddres
 	}
 }
 
+func (msg MsgWithdrawDelegatorReward) Group() int32  { return 0 }
 func (msg MsgWithdrawDelegatorReward) Route() string { return MsgRoute }
 func (msg MsgWithdrawDelegatorReward) Type() string  { return "withdraw_delegation_reward" }
 
@@ -98,6 +100,7 @@ func NewMsgWithdrawValidatorCommission(valAddr sdk.ValAddress) MsgWithdrawValida
 	}
 }
 
+func (msg MsgWithdrawValidatorCommission) Group() int32  { return 0 }
 func (msg MsgWithdrawValidatorCommission) Route() string { return MsgRoute }
 func (msg MsgWithdrawValidatorCommission) Type() string  { return "withdraw_validator_rewards_all" }
 

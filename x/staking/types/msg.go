@@ -65,6 +65,7 @@ func NewMsgCreateValidatorOnBehalfOf(delAddr sdk.AccAddress, valAddr sdk.ValAddr
 }
 
 //nolint
+func (msg MsgCreateValidator) Group() int32  { return 0 }
 func (msg MsgCreateValidator) Route() string { return RouterKey }
 func (msg MsgCreateValidator) Type() string  { return "create_validator" }
 
@@ -172,6 +173,7 @@ func NewMsgEditValidator(valAddr sdk.ValAddress, description Description, newRat
 }
 
 //nolint
+func (msg MsgEditValidator) Group() int32  { return 0 }
 func (msg MsgEditValidator) Route() string { return RouterKey }
 func (msg MsgEditValidator) Type() string  { return "edit_validator" }
 func (msg MsgEditValidator) GetSigners() []sdk.AccAddress {
@@ -223,6 +225,7 @@ func NewMsgDelegate(delAddr sdk.AccAddress, valAddr sdk.ValAddress, value sdk.Co
 }
 
 //nolint
+func (msg MsgDelegate) Group() int32  { return 0 }
 func (msg MsgDelegate) Route() string { return RouterKey }
 func (msg MsgDelegate) Type() string  { return "delegate" }
 func (msg MsgDelegate) GetSigners() []sdk.AccAddress {
@@ -271,6 +274,7 @@ func NewMsgBeginRedelegate(delAddr sdk.AccAddress, valSrcAddr,
 }
 
 //nolint
+func (msg MsgBeginRedelegate) Group() int32  { return 0 }
 func (msg MsgBeginRedelegate) Route() string { return RouterKey }
 func (msg MsgBeginRedelegate) Type() string  { return "begin_redelegate" }
 func (msg MsgBeginRedelegate) GetSigners() []sdk.AccAddress {
@@ -316,6 +320,7 @@ func NewMsgUndelegate(delAddr sdk.AccAddress, valAddr sdk.ValAddress, sharesAmou
 }
 
 //nolint
+func (msg MsgUndelegate) Group() int32                 { return 0 }
 func (msg MsgUndelegate) Route() string                { return RouterKey }
 func (msg MsgUndelegate) Type() string                 { return "begin_unbonding" }
 func (msg MsgUndelegate) GetSigners() []sdk.AccAddress { return []sdk.AccAddress{msg.DelegatorAddr} }

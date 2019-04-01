@@ -33,7 +33,7 @@ func (ctx CLIContext) BroadcastTxAndAwaitCommit(tx []byte) (sdk.TxResponse, erro
 		return sdk.TxResponse{}, err
 	}
 
-	res, err := node.BroadcastTxCommit(tx)
+	res, err := node.BroadcastTxCommit(tx, ctx.Group)
 	if err != nil {
 		return sdk.NewResponseFormatBroadcastTxCommit(res), err
 	}
@@ -56,7 +56,7 @@ func (ctx CLIContext) BroadcastTxSync(tx []byte) (sdk.TxResponse, error) {
 		return sdk.TxResponse{}, err
 	}
 
-	res, err := node.BroadcastTxSync(tx)
+	res, err := node.BroadcastTxSync(tx, ctx.Group)
 	if err != nil {
 		return sdk.NewResponseFormatBroadcastTx(res), err
 	}
@@ -71,7 +71,7 @@ func (ctx CLIContext) BroadcastTxAsync(tx []byte) (sdk.TxResponse, error) {
 		return sdk.TxResponse{}, err
 	}
 
-	res, err := node.BroadcastTxAsync(tx)
+	res, err := node.BroadcastTxAsync(tx, ctx.Group)
 	if err != nil {
 		return sdk.NewResponseFormatBroadcastTx(res), err
 	}

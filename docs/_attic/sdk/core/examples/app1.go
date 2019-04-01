@@ -59,6 +59,7 @@ func NewMsgSend(from, to sdk.AccAddress, amt sdk.Coins) MsgSend {
 
 // Implements Msg.
 // nolint
+func (msg MsgSend) Group() int32  { return 0 }
 func (msg MsgSend) Route() string { return "send" }
 func (msg MsgSend) Type() string  { return "send" }
 
