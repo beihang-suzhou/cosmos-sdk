@@ -62,12 +62,11 @@ func CompleteAndBroadcastTxCLI(txBldr authtxb.TxBuilder, cliCtx context.CLIConte
 		return nil
 	}
 
-	// todo
-	// passphrase, err := keys.GetPassphrase(fromName)
-	// if err != nil {
-	// 	return err
-	// }
-	passphrase := "12345678"
+	passphrase, err := keys.GetPassphrase(fromName)
+	if err != nil {
+		return err
+	}
+
 	// build and sign the transaction
 	txBytes, err := txBldr.BuildAndSign(fromName, passphrase, msgs)
 	if err != nil {

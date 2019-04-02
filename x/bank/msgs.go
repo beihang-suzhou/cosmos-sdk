@@ -21,6 +21,8 @@ func NewMsgSend(fromAddr, toAddr sdk.AccAddress, amount sdk.Coins) MsgSend {
 	return MsgSend{FromAddress: fromAddr, ToAddress: toAddr, Amount: amount}
 }
 
+func (msg MsgSend) Group() int32 { return 0 }
+
 // Route Implements Msg.
 func (msg MsgSend) Route() string { return RouterKey }
 
@@ -63,6 +65,8 @@ var _ sdk.Msg = MsgMultiSend{}
 func NewMsgMultiSend(in []Input, out []Output) MsgMultiSend {
 	return MsgMultiSend{Inputs: in, Outputs: out}
 }
+
+func (msg MsgMultiSend) Group() int32 { return 0 }
 
 // Route Implements Msg
 func (msg MsgMultiSend) Route() string { return RouterKey }

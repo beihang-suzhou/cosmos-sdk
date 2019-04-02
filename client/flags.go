@@ -37,6 +37,7 @@ const (
 	FlagDryRun             = "dry-run"
 	FlagGenerateOnly       = "generate-only"
 	FlagIndentResponse     = "indent"
+	FlagGroup              = "group"
 	FlagListenAddr         = "laddr"
 	FlagCORS               = "cors"
 	FlagMaxOpenConnections = "max-open"
@@ -62,6 +63,7 @@ func GetCommands(cmds ...*cobra.Command) []*cobra.Command {
 		c.Flags().Bool(FlagUseLedger, false, "Use a connected Ledger device")
 		c.Flags().String(FlagNode, "tcp://localhost:26657", "<host>:<port> to tendermint rpc interface for this chain")
 		c.Flags().Int64(FlagHeight, 0, "block height to query, omit to get most recent provable block")
+		c.Flags().Int32(FlagGroup, 0, "Tx group num.")
 		viper.BindPFlag(FlagTrustNode, c.Flags().Lookup(FlagTrustNode))
 		viper.BindPFlag(FlagUseLedger, c.Flags().Lookup(FlagUseLedger))
 		viper.BindPFlag(FlagNode, c.Flags().Lookup(FlagNode))

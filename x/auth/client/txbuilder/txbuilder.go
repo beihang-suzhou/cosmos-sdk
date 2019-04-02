@@ -32,6 +32,23 @@ type TxBuilder struct {
 	//Cert          []byte      `json:"cert"`
 }
 
+func TestNewTxBuilder(strKeys string) TxBuilder {
+	kb, err := keys.NewKeyBaseFromDir(strKeys)
+	if err != nil {
+		panic(err)
+	}
+	return TxBuilder{
+		keybase:            kb,
+		accountNumber:      0,
+		sequence:           0,
+		gas:                client.GasFlagVar.Gas,
+		gasAdjustment:      1.0,
+		simulateAndExecute: false,
+		chainID:            "test-chain-bs",
+		memo:               "",
+	}
+}
+
 // NewTxBuilder returns a new initialized TxBuilder.
 func NewTxBuilder(
 	txEncoder sdk.TxEncoder, accNumber, seq, gas uint64, gasAdj float64,
@@ -230,7 +247,8 @@ func (bldr TxBuilder) BuildAndSign(name, passphrase string, msgs []sdk.Msg) ([]b
 		return nil, err
 	}
 
-	return bldr.Sign(name, passphrase, msg)
+	ret, err := bldr.Sign(name, passphrase, msg)
+	return ret, err
 }
 
 // BuildTxForSim creates a StdSignMsg and encodes a transaction with the
@@ -285,6 +303,7 @@ func MakeSignature(keybase crkeys.Keybase, name, passphrase string,
 	if err != nil {
 		return
 	}
+
 	return auth.StdSignature{
 		PubKey:    pubkey,
 		Signature: sigBytes,

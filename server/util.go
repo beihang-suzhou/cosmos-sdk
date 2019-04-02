@@ -35,7 +35,7 @@ type Context struct {
 
 func NewDefaultContext() *Context {
 	return NewContext(
-		cfg.DefaultConfig(),
+		cfg.DefaultConfig(0),
 		log.NewTMLogger(log.NewSyncWriter(os.Stdout)),
 	)
 }
@@ -79,7 +79,7 @@ func PersistentPreRunEFn(context *Context) func(*cobra.Command, []string) error 
 
 // If a new config is created, change some of the default tendermint settings
 func interceptLoadConfig() (conf *cfg.Config, err error) {
-	tmpConf := cfg.DefaultConfig()
+	tmpConf := cfg.DefaultConfig(0)
 	err = viper.Unmarshal(tmpConf)
 	if err != nil {
 		// TODO: Handle with #870

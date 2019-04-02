@@ -6,7 +6,7 @@ import (
 
 // Transactions messages must fulfill the Msg
 type Msg interface {
-
+	Group() int32
 	// Return the message type.
 	// Must be alphanumeric or empty.
 	Route() string
@@ -64,6 +64,7 @@ func NewTestMsg(addrs ...AccAddress) *TestMsg {
 }
 
 //nolint
+func (msg *TestMsg) Group() int32  { return 0 }
 func (msg *TestMsg) Route() string { return "TestMsg" }
 func (msg *TestMsg) Type() string  { return "Test message" }
 func (msg *TestMsg) GetSignBytes() []byte {
