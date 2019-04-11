@@ -384,10 +384,10 @@ func (rs *Store) nameToKey(name string) types.StoreKey {
 		fmt.Println("i值: ",i)
 		fmt.Println("v值: ",v)
 	}*/
-	fmt.Println("name参数值：",name)
-	for key,_ :=range rs.storesParams {
-		fmt.Println("i值: ",key.Name())
-	}
+	//fmt.Println("name参数值：",name)
+	//for key,_ :=range rs.storesParams {
+	//	fmt.Println("i值: ",key.Name())
+	//}
 
 	for key := range rs.storesParams {
 		if key.Name() == name {
