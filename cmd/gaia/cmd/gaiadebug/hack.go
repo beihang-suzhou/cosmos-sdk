@@ -194,7 +194,7 @@ func NewGaiaApp(logger log.Logger, db dbm.DB, baseAppOptions ...func(*bam.BaseAp
 	app.SetAnteHandler(auth.NewAnteHandler(app.accountKeeper, app.feeCollectionKeeper))
 	app.MountStores(app.keyMain, app.keyAccount, app.keyStaking, app.keySlashing, app.keyParams)
 	app.MountStore(app.tkeyParams, sdk.StoreTypeTransient)
-	err := app.LoadLatestVersion(app.keyMain)
+	err := app.LoadLatestVersion(0, app.keyMain)
 	if err != nil {
 		cmn.Exit(err.Error())
 	}

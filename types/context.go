@@ -35,13 +35,14 @@ type Context struct {
 }
 
 // create a new context
-func NewContext(ms MultiStore, header abci.Header, isCheckTx bool, logger log.Logger) Context {
+func NewContext(ms MultiStore, group int32, header abci.Header, isCheckTx bool, logger log.Logger) Context {
 	c := Context{
 		Context: context.Background(),
 		pst:     newThePast(),
 		gen:     0,
 	}
-	c = c.WithMultiStore(ms)
+
+	c = c.WithMultiStore(group, ms)
 	c = c.WithBlockHeader(header)
 	c = c.WithBlockHeight(header.Height)
 	c = c.WithChainID(header.ChainID)
@@ -134,8 +135,7 @@ func (c Context) withValue(key interface{}, value interface{}) Context {
 type contextKey int // local to the context module
 
 const (
-	contextKeyMultiStore contextKey = iota
-	contextKeyBlockHeader
+	contextKeyBlockHeader contextKey = iota
 	contextKeyBlockHeight
 	contextKeyChainID
 	contextKeyIsCheckTx
@@ -146,10 +146,12 @@ const (
 	contextKeyBlockGasMeter
 	contextKeyMinGasPrices
 	contextKeyConsensusParams
+	contextKeyMultiStore //must the last
 )
 
 func (c Context) MultiStore() MultiStore {
-	return c.Value(contextKeyMultiStore).(MultiStore)
+	group := (int32)(contextKeyMultiStore) + c.BlockHeader().Group
+	return c.Value(group).(MultiStore)
 }
 
 func (c Context) BlockHeader() abci.Header { return c.Value(contextKeyBlockHeader).(abci.Header) }
@@ -178,8 +180,9 @@ func (c Context) ConsensusParams() *abci.ConsensusParams {
 	return c.Value(contextKeyConsensusParams).(*abci.ConsensusParams)
 }
 
-func (c Context) WithMultiStore(ms MultiStore) Context {
-	return c.withValue(contextKeyMultiStore, ms)
+func (c Context) WithMultiStore(group int32, ms MultiStore) Context {
+	group = (int32)(contextKeyMultiStore) + group
+	return c.withValue(group, ms)
 }
 
 func (c Context) WithBlockHeader(header abci.Header) Context {
@@ -237,7 +240,7 @@ func (c Context) WithConsensusParams(params *abci.ConsensusParams) Context {
 // written to the context when writeCache is called.
 func (c Context) CacheContext() (cc Context, writeCache func()) {
 	cms := c.MultiStore().CacheMultiStore()
-	cc = c.WithMultiStore(cms)
+	cc = c.WithMultiStore(0, cms)
 	return cc, cms.Write
 }
 

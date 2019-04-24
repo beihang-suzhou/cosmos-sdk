@@ -68,21 +68,21 @@ func getEndBlocker(keeper Keeper) sdk.EndBlocker {
 
 // gov and staking initchainer
 func getInitChainer(mapp *mock.App, keeper Keeper, stakingKeeper staking.Keeper, genState GenesisState) sdk.InitChainer {
-	return func(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
+	return func(ctx map[int32]sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
 		mapp.InitChainer(ctx, req)
 
 		stakingGenesis := staking.DefaultGenesisState()
 		tokens := sdk.TokensFromTendermintPower(100000)
 		stakingGenesis.Pool.NotBondedTokens = tokens
 
-		validators, err := staking.InitGenesis(ctx, stakingKeeper, stakingGenesis)
+		validators, err := staking.InitGenesis(ctx[0], stakingKeeper, stakingGenesis)
 		if err != nil {
 			panic(err)
 		}
 		if genState.IsEmpty() {
-			InitGenesis(ctx, keeper, DefaultGenesisState())
+			InitGenesis(ctx[0], keeper, DefaultGenesisState())
 		} else {
-			InitGenesis(ctx, keeper, genState)
+			InitGenesis(ctx[0], keeper, genState)
 		}
 		return abci.ResponseInitChain{
 			Validators: validators,

@@ -23,7 +23,7 @@ func NewStore() *Store {
 
 // Implements CommitStore
 // Commit cleans up Store.
-func (ts *Store) Commit() (id types.CommitID) {
+func (ts *Store) Commit(group int32) (id types.CommitID) {
 	ts.Store = dbadapter.Store{dbm.NewMemDB()}
 	return
 }

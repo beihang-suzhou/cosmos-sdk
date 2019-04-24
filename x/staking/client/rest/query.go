@@ -230,7 +230,7 @@ func redelegationsHandlerFn(cliCtx context.CLIContext, cdc *codec.Codec) http.Ha
 			return
 		}
 
-		res, err := cliCtx.QueryWithData("custom/staking/redelegations", bz)
+		res, err := cliCtx.QueryWithData(0, "custom/staking/redelegations", bz)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -257,7 +257,7 @@ func delegatorValidatorHandlerFn(cliCtx context.CLIContext, cdc *codec.Codec) ht
 // HTTP request handler to query list of validators
 func validatorsHandlerFn(cliCtx context.CLIContext, cdc *codec.Codec) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		res, err := cliCtx.QueryWithData("custom/staking/validators", nil)
+		res, err := cliCtx.QueryWithData(0, "custom/staking/validators", nil)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -284,7 +284,7 @@ func validatorUnbondingDelegationsHandlerFn(cliCtx context.CLIContext, cdc *code
 // HTTP request handler to query the pool information
 func poolHandlerFn(cliCtx context.CLIContext, cdc *codec.Codec) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		res, err := cliCtx.QueryWithData("custom/staking/pool", nil)
+		res, err := cliCtx.QueryWithData(0, "custom/staking/pool", nil)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -296,7 +296,7 @@ func poolHandlerFn(cliCtx context.CLIContext, cdc *codec.Codec) http.HandlerFunc
 // HTTP request handler to query the staking params values
 func paramsHandlerFn(cliCtx context.CLIContext, cdc *codec.Codec) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		res, err := cliCtx.QueryWithData("custom/staking/parameters", nil)
+		res, err := cliCtx.QueryWithData(0, "custom/staking/parameters", nil)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return

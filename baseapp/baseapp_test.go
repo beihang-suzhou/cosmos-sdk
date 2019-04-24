@@ -55,13 +55,13 @@ func setupBaseApp(t *testing.T, options ...func(*BaseApp)) *BaseApp {
 
 	// no stores are mounted
 	require.Panics(t, func() {
-		app.LoadLatestVersion(capKey1)
+		app.LoadLatestVersion(0, capKey1)
 	})
 
 	app.MountStores(capKey1, capKey2)
 
 	// stores are mounted
-	err := app.LoadLatestVersion(capKey1)
+	err := app.LoadLatestVersion(0, capKey1)
 	require.Nil(t, err)
 	return app
 }
@@ -88,7 +88,7 @@ func TestLoadVersion(t *testing.T) {
 	// make a cap key and mount the store
 	capKey := sdk.NewKVStoreKey(MainStoreKey)
 	app.MountStores(capKey)
-	err := app.LoadLatestVersion(capKey) // needed to make stores non-nil
+	err := app.LoadLatestVersion(0, capKey) // needed to make stores non-nil
 	require.Nil(t, err)
 
 	emptyCommitID := sdk.CommitID{}
@@ -114,7 +114,7 @@ func TestLoadVersion(t *testing.T) {
 	// reload with LoadLatestVersion
 	app = NewBaseApp(name, logger, db, nil, pruningOpt)
 	app.MountStores(capKey)
-	err = app.LoadLatestVersion(capKey)
+	err = app.LoadLatestVersion(0, capKey)
 	require.Nil(t, err)
 	testLoadVersionHelper(t, app, int64(2), commitID2)
 
@@ -139,11 +139,11 @@ func TestLoadVersionInvalid(t *testing.T) {
 
 	capKey := sdk.NewKVStoreKey(MainStoreKey)
 	app.MountStores(capKey)
-	err := app.LoadLatestVersion(capKey)
+	err := app.LoadLatestVersion(0, capKey)
 	require.Nil(t, err)
 
 	// require error when loading an invalid version
-	err = app.LoadVersion(-1, capKey)
+	err = app.LoadVersion(0, -1, capKey)
 	require.Error(t, err)
 
 	header := abci.Header{Height: 1}
@@ -294,7 +294,7 @@ func TestInitChainer(t *testing.T) {
 	app.SetInitChainer(initChainer)
 
 	// stores are mounted and private members are set - sealing baseapp
-	err := app.LoadLatestVersion(capKey) // needed to make stores non-nil
+	err := app.LoadLatestVersion(0, capKey) // needed to make stores non-nil
 	require.Nil(t, err)
 
 	app.InitChain(abci.RequestInitChain{AppStateBytes: []byte("{}"), ChainId: "test-chain-id"}) // must have valid JSON genesis file, even if empty
@@ -314,7 +314,7 @@ func TestInitChainer(t *testing.T) {
 	app = NewBaseApp(name, logger, db, nil)
 	app.SetInitChainer(initChainer)
 	app.MountStores(capKey, capKey2)
-	err = app.LoadLatestVersion(capKey) // needed to make stores non-nil
+	err = app.LoadLatestVersion(0, capKey) // needed to make stores non-nil
 	require.Nil(t, err)
 
 	// ensure we can still query after reloading

@@ -22,7 +22,7 @@ func (app *GaiaApp) runtimeInvariants() []sdk.Invariant {
 }
 
 func (app *GaiaApp) assertRuntimeInvariants() {
-	ctx := app.NewContext(false, abci.Header{Height: app.LastBlockHeight() + 1})
+	ctx := app.NewContext(false, abci.Header{Height: app.LastBlockHeight(0) + 1})
 	app.assertRuntimeInvariantsOnContext(ctx)
 }
 

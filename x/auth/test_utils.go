@@ -37,12 +37,12 @@ func setupTestInput() testInput {
 	ms.MountStoreWithDB(fckCapKey, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyParams, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
-	ms.LoadLatestVersion()
+	ms.LoadLatestVersion(0)
 
 	pk := params.NewKeeper(cdc, keyParams, tkeyParams)
 	ak := NewAccountKeeper(cdc, authCapKey, pk.Subspace(DefaultParamspace), ProtoBaseAccount)
 	fck := NewFeeCollectionKeeper(cdc, fckCapKey)
-	ctx := sdk.NewContext(ms, abci.Header{ChainID: "test-chain-id"}, false, log.NewNopLogger())
+	ctx := sdk.NewContext(ms, 0, abci.Header{ChainID: "test-chain-id"}, false, log.NewNopLogger())
 
 	ak.SetParams(ctx, DefaultParams())
 

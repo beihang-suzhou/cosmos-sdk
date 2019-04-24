@@ -85,7 +85,7 @@ func queryRedelegations(cliCtx context.CLIContext, cdc *codec.Codec, endpoint st
 			return
 		}
 
-		res, err := cliCtx.QueryWithData(endpoint, bz)
+		res, err := cliCtx.QueryWithData(0, endpoint, bz)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -115,7 +115,7 @@ func queryBonds(cliCtx context.CLIContext, cdc *codec.Codec, endpoint string) ht
 			return
 		}
 
-		res, err := cliCtx.QueryWithData(endpoint, bz)
+		res, err := cliCtx.QueryWithData(0, endpoint, bz)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -143,7 +143,7 @@ func queryDelegator(cliCtx context.CLIContext, cdc *codec.Codec, endpoint string
 			return
 		}
 
-		res, err := cliCtx.QueryWithData(endpoint, bz)
+		res, err := cliCtx.QueryWithData(0, endpoint, bz)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -171,7 +171,7 @@ func queryValidator(cliCtx context.CLIContext, cdc *codec.Codec, endpoint string
 			return
 		}
 
-		res, err := cliCtx.QueryWithData(endpoint, bz)
+		res, err := cliCtx.QueryWithData(0, endpoint, bz)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return

@@ -21,7 +21,7 @@ import (
 
 const (
 	latestVersionKey = "s/latest"
-	commitInfoKeyFmt = "s/%d" // s/<version>
+	commitInfoKeyFmt = "s/%d/%d" // s/<version>/<group>
 )
 
 // Store is composed of many CommitStores. Name contrasts with
@@ -95,13 +95,13 @@ func (rs *Store) GetCommitKVStore(key types.StoreKey) types.CommitKVStore {
 }
 
 // Implements CommitMultiStore.
-func (rs *Store) LoadLatestVersion() error {
-	ver := getLatestVersion(rs.db)
-	return rs.LoadVersion(ver)
+func (rs *Store) LoadLatestVersion(group int32) error {
+	ver := getLatestVersion(rs.db, group)
+	return rs.LoadVersion(group, ver)
 }
 
 // Implements CommitMultiStore.
-func (rs *Store) LoadVersion(ver int64) error {
+func (rs *Store) LoadVersion(group int32, ver int64) error {
 
 	// Special logic for version 0
 	if ver == 0 {
@@ -120,7 +120,7 @@ func (rs *Store) LoadVersion(ver int64) error {
 	// Otherwise, version is 1 or greater
 
 	// Get commitInfo
-	cInfo, err := getCommitInfo(rs.db, ver)
+	cInfo, err := getCommitInfo(rs.db, group, ver)
 	if err != nil {
 		return err
 	}
@@ -190,16 +190,16 @@ func (rs *Store) LastCommitID() types.CommitID {
 }
 
 // Implements Committer/CommitStore.
-func (rs *Store) Commit() types.CommitID {
+func (rs *Store) Commit(group int32) types.CommitID {
 
 	// Commit stores.
 	version := rs.lastCommitID.Version + 1
-	commitInfo := commitStores(version, rs.stores)
+	commitInfo := commitStores(version, group, rs.stores)
 
 	// Need to update atomically.
 	batch := rs.db.NewBatch()
-	setCommitInfo(batch, version, commitInfo)
-	setLatestVersion(batch, version)
+	setCommitInfo(batch, group, version, commitInfo)
+	setLatestVersion(batch, group, version)
 	batch.Write()
 
 	// Prepare for next version.
@@ -309,7 +309,7 @@ func (rs *Store) Query(req abci.RequestQuery) abci.ResponseQuery {
 		return errors.ErrInternal("substore proof was nil/empty when it should never be").QueryResult()
 	}
 
-	commitInfo, errMsg := getCommitInfo(rs.db, res.Height)
+	commitInfo, errMsg := getCommitInfo(rs.db, req.Group, res.Height)
 	if errMsg != nil {
 		return errors.ErrInternal(errMsg.Error()).QueryResult()
 	}
@@ -462,9 +462,10 @@ func (si storeInfo) Hash() []byte {
 //----------------------------------------
 // Misc.
 
-func getLatestVersion(db dbm.DB) int64 {
+func getLatestVersion(db dbm.DB, group int32) int64 {
 	var latest int64
-	latestBytes := db.Get([]byte(latestVersionKey))
+	str := fmt.Sprintf("%s-%d", latestVersionKey, group)
+	latestBytes := db.Get([]byte(str))
 	if latestBytes == nil {
 		return 0
 	}
@@ -478,18 +479,19 @@ func getLatestVersion(db dbm.DB) int64 {
 }
 
 // Set the latest version.
-func setLatestVersion(batch dbm.Batch, version int64) {
+func setLatestVersion(batch dbm.Batch, group int32, version int64) {
 	latestBytes, _ := cdc.MarshalBinaryLengthPrefixed(version)
-	batch.Set([]byte(latestVersionKey), latestBytes)
+	str := fmt.Sprintf("%s-%d", latestVersionKey, group)
+	batch.Set([]byte(str), latestBytes)
 }
 
 // Commits each store and returns a new commitInfo.
-func commitStores(version int64, storeMap map[types.StoreKey]types.CommitStore) commitInfo {
+func commitStores(version int64, group int32, storeMap map[types.StoreKey]types.CommitStore) commitInfo {
 	storeInfos := make([]storeInfo, 0, len(storeMap))
 
 	for key, store := range storeMap {
 		// Commit
-		commitID := store.Commit()
+		commitID := store.Commit(group)
 
 		if store.GetStoreType() == types.StoreTypeTransient {
 			continue
@@ -511,10 +513,10 @@ func commitStores(version int64, storeMap map[types.StoreKey]types.CommitStore) 
 }
 
 // Gets commitInfo from disk.
-func getCommitInfo(db dbm.DB, ver int64) (commitInfo, error) {
+func getCommitInfo(db dbm.DB, group int32, ver int64) (commitInfo, error) {
 
 	// Get from DB.
-	cInfoKey := fmt.Sprintf(commitInfoKeyFmt, ver)
+	cInfoKey := fmt.Sprintf(commitInfoKeyFmt, ver, group)
 	cInfoBytes := db.Get([]byte(cInfoKey))
 	if cInfoBytes == nil {
 		return commitInfo{}, fmt.Errorf("failed to get Store: no data")
@@ -531,8 +533,8 @@ func getCommitInfo(db dbm.DB, ver int64) (commitInfo, error) {
 }
 
 // Set a commitInfo for given version.
-func setCommitInfo(batch dbm.Batch, version int64, cInfo commitInfo) {
+func setCommitInfo(batch dbm.Batch, group int32, version int64, cInfo commitInfo) {
 	cInfoBytes := cdc.MustMarshalBinaryLengthPrefixed(cInfo)
-	cInfoKey := fmt.Sprintf(commitInfoKeyFmt, version)
+	cInfoKey := fmt.Sprintf(commitInfoKeyFmt, version, group)
 	batch.Set([]byte(cInfoKey), cInfoBytes)
 }

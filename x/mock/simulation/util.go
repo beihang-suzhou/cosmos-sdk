@@ -17,7 +17,7 @@ import (
 func assertAllInvariants(t *testing.T, app *baseapp.BaseApp, invs sdk.Invariants,
 	event string, displayLogs func()) {
 
-	ctx := app.NewContext(false, abci.Header{Height: app.LastBlockHeight() + 1})
+	ctx := app.NewContext(false, abci.Header{Height: app.LastBlockHeight(0) + 1})
 
 	for i := 0; i < len(invs); i++ {
 		if err := invs[i](ctx); err != nil {

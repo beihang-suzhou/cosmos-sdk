@@ -31,7 +31,7 @@ $ gaiacli query staking validator cosmosvaloper1gghjut3ccd8ay0zduzj64hwre2fxs9ld
 				return err
 			}
 
-			res, err := cliCtx.QueryStore(staking.GetValidatorKey(addr), storeName)
+			res, err := cliCtx.QueryStore(0, staking.GetValidatorKey(addr), storeName)
 			if err != nil {
 				return err
 			}
@@ -58,7 +58,7 @@ $ gaiacli query staking validators
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
 
-			resKVs, err := cliCtx.QuerySubspace(staking.ValidatorsKey, storeName)
+			resKVs, err := cliCtx.QuerySubspace(0, staking.ValidatorsKey, storeName)
 			if err != nil {
 				return err
 			}
@@ -97,7 +97,7 @@ $ gaiacli query staking unbonding-delegations-from cosmosvaloper1gghjut3ccd8ay0z
 			}
 
 			route := fmt.Sprintf("custom/%s/%s", storeKey, staking.QueryValidatorUnbondingDelegations)
-			res, err := cliCtx.QueryWithData(route, bz)
+			res, err := cliCtx.QueryWithData(0, route, bz)
 			if err != nil {
 				return err
 			}
@@ -133,7 +133,7 @@ $ gaiacli query staking redelegations-from cosmosvaloper1gghjut3ccd8ay0zduzj64hw
 			}
 
 			route := fmt.Sprintf("custom/%s/%s", storeKey, staking.QueryValidatorRedelegations)
-			res, err := cliCtx.QueryWithData(route, bz)
+			res, err := cliCtx.QueryWithData(0, route, bz)
 			if err != nil {
 				return err
 			}
@@ -168,7 +168,7 @@ $ gaiacli query staking delegation cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75ru9p
 				return err
 			}
 
-			res, err := cliCtx.QueryStore(staking.GetDelegationKey(delAddr, valAddr), storeName)
+			res, err := cliCtx.QueryStore(0, staking.GetDelegationKey(delAddr, valAddr), storeName)
 			if err != nil {
 				return err
 			}
@@ -202,7 +202,7 @@ $ gaiacli query staking delegations cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75ru9
 				return err
 			}
 
-			resKVs, err := cliCtx.QuerySubspace(staking.GetDelegationsKey(delegatorAddr), storeName)
+			resKVs, err := cliCtx.QuerySubspace(0, staking.GetDelegationsKey(delegatorAddr), storeName)
 			if err != nil {
 				return err
 			}
@@ -242,7 +242,7 @@ $ gaiacli query staking delegations-to cosmosvaloper1gghjut3ccd8ay0zduzj64hwre2f
 			}
 
 			route := fmt.Sprintf("custom/%s/%s", storeKey, staking.QueryValidatorDelegations)
-			res, err := cliCtx.QueryWithData(route, bz)
+			res, err := cliCtx.QueryWithData(0, route, bz)
 			if err != nil {
 				return err
 			}
@@ -278,7 +278,7 @@ $ gaiacli query staking unbonding-delegation cosmos1gghjut3ccd8ay0zduzj64hwre2fx
 				return err
 			}
 
-			res, err := cliCtx.QueryStore(staking.GetUBDKey(delAddr, valAddr), storeName)
+			res, err := cliCtx.QueryStore(0, staking.GetUBDKey(delAddr, valAddr), storeName)
 			if err != nil {
 				return err
 			}
@@ -308,7 +308,7 @@ $ gaiacli query staking unbonding-delegation cosmos1gghjut3ccd8ay0zduzj64hwre2fx
 				return err
 			}
 
-			resKVs, err := cliCtx.QuerySubspace(staking.GetUBDsKey(delegatorAddr), storeName)
+			resKVs, err := cliCtx.QuerySubspace(0, staking.GetUBDsKey(delegatorAddr), storeName)
 			if err != nil {
 				return err
 			}
@@ -352,7 +352,7 @@ $ gaiacli query staking redelegation cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75ru
 				return err
 			}
 
-			res, err := cliCtx.QueryStore(staking.GetREDKey(delAddr, valSrcAddr, valDstAddr), storeName)
+			res, err := cliCtx.QueryStore(0, staking.GetREDKey(delAddr, valSrcAddr, valDstAddr), storeName)
 			if err != nil {
 				return err
 			}
@@ -381,7 +381,7 @@ $ gaiacli query staking redelegation cosmos1gghjut3ccd8ay0zduzj64hwre2fxs9ld75ru
 				return err
 			}
 
-			resKVs, err := cliCtx.QuerySubspace(staking.GetREDsKey(delegatorAddr), storeName)
+			resKVs, err := cliCtx.QuerySubspace(0, staking.GetREDsKey(delegatorAddr), storeName)
 			if err != nil {
 				return err
 			}
@@ -409,7 +409,7 @@ $ gaiacli query staking pool
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
 
-			res, err := cliCtx.QueryStore(staking.PoolKey, storeName)
+			res, err := cliCtx.QueryStore(0, staking.PoolKey, storeName)
 			if err != nil {
 				return err
 			}
@@ -433,7 +433,7 @@ $ gaiacli query staking params
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", storeName, staking.QueryParameters)
-			bz, err := cliCtx.QueryWithData(route, nil)
+			bz, err := cliCtx.QueryWithData(0, route, nil)
 			if err != nil {
 				return err
 			}

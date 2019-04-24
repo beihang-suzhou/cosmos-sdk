@@ -21,6 +21,6 @@ type (
 func NewKeyTable(keytypes ...interface{}) KeyTable {
 	return subspace.NewKeyTable(keytypes...)
 }
-func DefaultTestComponents(t *testing.T) (sdk.Context, Subspace, func() sdk.CommitID) {
+func DefaultTestComponents(t *testing.T) (sdk.Context, Subspace, func(group int32) sdk.CommitID) {
 	return subspace.DefaultTestComponents(t)
 }

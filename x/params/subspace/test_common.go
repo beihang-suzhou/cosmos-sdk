@@ -21,7 +21,7 @@ const (
 )
 
 // Returns components for testing
-func DefaultTestComponents(t *testing.T) (sdk.Context, Subspace, func() sdk.CommitID) {
+func DefaultTestComponents(t *testing.T) (sdk.Context, Subspace, func(group int32) sdk.CommitID) {
 	cdc := codec.New()
 	key := sdk.NewKVStoreKey(StoreKey)
 	tkey := sdk.NewTransientStoreKey(TStoreKey)
@@ -31,9 +31,9 @@ func DefaultTestComponents(t *testing.T) (sdk.Context, Subspace, func() sdk.Comm
 	ms.SetTracingContext(sdk.TraceContext{})
 	ms.MountStoreWithDB(key, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkey, sdk.StoreTypeTransient, db)
-	err := ms.LoadLatestVersion()
+	err := ms.LoadLatestVersion(0)
 	require.Nil(t, err)
-	ctx := sdk.NewContext(ms, abci.Header{}, false, log.NewTMLogger(os.Stdout))
+	ctx := sdk.NewContext(ms, 0, abci.Header{}, false, log.NewTMLogger(os.Stdout))
 	subspace := NewSubspace(cdc, key, tkey, TestParamStore)
 
 	return ctx, subspace, ms.Commit

@@ -77,7 +77,7 @@ func withdrawDelegatorRewardsHandlerFn(
 			return
 		}
 
-		msgs, err := common.WithdrawAllDelegatorRewards(cliCtx, cdc, queryRoute, delAddr)
+		msgs, err := common.WithdrawAllDelegatorRewards(0, cliCtx, cdc, queryRoute, delAddr)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return

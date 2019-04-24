@@ -1,10 +1,12 @@
 package baseapp
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
 	"runtime/debug"
+	"sort"
 	"strings"
 
 	"errors"
@@ -44,15 +46,15 @@ const (
 type BaseApp struct {
 	// initialized on creation
 	logger      log.Logger
-	name        string               // application name from abci.Info
-	db          dbm.DB               // common DB backend
-	cms         sdk.CommitMultiStore // Main (uncached) state
-	router      Router               // handle any kind of message
-	queryRouter QueryRouter          // router for redirecting query calls
-	txDecoder   sdk.TxDecoder        // unmarshal []byte into sdk.Tx
+	name        string                         // application name from abci.Info
+	db          dbm.DB                         // common DB backend
+	cms         map[int32]sdk.CommitMultiStore // Main (uncached) state
+	router      Router                         // handle any kind of message
+	queryRouter QueryRouter                    // router for redirecting query calls
+	txDecoder   sdk.TxDecoder                  // unmarshal []byte into sdk.Tx
 
 	// set upon LoadVersion or LoadLatestVersion.
-	baseKey *sdk.KVStoreKey // Main KVStore in cms
+	baseKey map[int32]*sdk.KVStoreKey // Main KVStore in cms
 
 	anteHandler    sdk.AnteHandler  // ante handler for fee and auth
 	initChainer    sdk.InitChainer  // initialize state with validators and state blob
@@ -67,9 +69,9 @@ type BaseApp struct {
 	// checkState is set on initialization and reset on Commit.
 	// deliverState is set in InitChain and BeginBlock and cleared on Commit.
 	// See methods setCheckState and setDeliverState.
-	checkState   *state          // for CheckTx
-	deliverState *state          // for DeliverTx
-	voteInfos    []abci.VoteInfo // absent validators from begin block
+	checkState   map[int32]*state // for CheckTx
+	deliverState map[int32]*state // for DeliverTx
+	voteInfos    []abci.VoteInfo  // absent validators from begin block
 
 	// consensus params
 	// TODO: Move this in the future to baseapp param store on main store.
@@ -91,14 +93,24 @@ var _ abci.Application = (*BaseApp)(nil)
 //
 // NOTE: The db is used to store the version number for now.
 func NewBaseApp(
-	name string, logger log.Logger, db dbm.DB, txDecoder sdk.TxDecoder, options ...func(*BaseApp),
+	name string, logger log.Logger, db dbm.DB, group int32, txDecoder sdk.TxDecoder, options ...func(*BaseApp),
 ) *BaseApp {
+
+	stores := make(map[int32]sdk.CommitMultiStore)
+
+	var i int32
+	for i = 0; i < 33; i++ {
+		if i != 0 && (group>>uint32(i-1))&1 == 0 {
+			continue
+		}
+		stores[i] = store.NewCommitMultiStore(db)
+	}
 
 	app := &BaseApp{
 		logger:         logger,
 		name:           name,
 		db:             db,
-		cms:            store.NewCommitMultiStore(db),
+		cms:            stores,
 		router:         NewRouter(),
 		queryRouter:    NewQueryRouter(),
 		txDecoder:      txDecoder,
@@ -124,24 +136,26 @@ func (app *BaseApp) Logger() log.Logger {
 // SetCommitMultiStoreTracer sets the store tracer on the BaseApp's underlying
 // CommitMultiStore.
 func (app *BaseApp) SetCommitMultiStoreTracer(w io.Writer) {
-	app.cms.SetTracer(w)
+	for _, item := range app.cms {
+		item.SetTracer(w)
+	}
 }
 
 // MountStores mounts all IAVL or DB stores to the provided keys in the BaseApp
 // multistore.
-func (app *BaseApp) MountStores(keys ...sdk.StoreKey) {
+func (app *BaseApp) MountStores(group int32, keys ...sdk.StoreKey) {
 	for _, key := range keys {
 		switch key.(type) {
 		case *sdk.KVStoreKey:
 			if !app.fauxMerkleMode {
-				app.MountStore(key, sdk.StoreTypeIAVL)
+				app.MountStore(group, key, sdk.StoreTypeIAVL)
 			} else {
 				// StoreTypeDB doesn't do anything upon commit, and it doesn't
 				// retain history, but it's useful for faster simulation.
-				app.MountStore(key, sdk.StoreTypeDB)
+				app.MountStore(group, key, sdk.StoreTypeDB)
 			}
 		case *sdk.TransientStoreKey:
-			app.MountStore(key, sdk.StoreTypeTransient)
+			app.MountStore(group, key, sdk.StoreTypeTransient)
 		default:
 			panic("Unrecognized store key type " + reflect.TypeOf(key).Name())
 		}
@@ -150,58 +164,82 @@ func (app *BaseApp) MountStores(keys ...sdk.StoreKey) {
 
 // MountStoreWithDB mounts a store to the provided key in the BaseApp
 // multistore, using a specified DB.
-func (app *BaseApp) MountStoreWithDB(key sdk.StoreKey, typ sdk.StoreType, db dbm.DB) {
-	app.cms.MountStoreWithDB(key, typ, db)
+func (app *BaseApp) MountStoreWithDB(group int32, key sdk.StoreKey, typ sdk.StoreType, db dbm.DB) {
+	if _, ok := app.cms[group]; !ok {
+		return
+	}
+	app.cms[group].MountStoreWithDB(key, typ, db)
 }
 
 // MountStore mounts a store to the provided key in the BaseApp multistore,
 // using the default DB.
-func (app *BaseApp) MountStore(key sdk.StoreKey, typ sdk.StoreType) {
-	app.cms.MountStoreWithDB(key, typ, nil)
+func (app *BaseApp) MountStore(group int32, key sdk.StoreKey, typ sdk.StoreType) {
+	if _, ok := app.cms[group]; !ok {
+		return
+	}
+	app.cms[group].MountStoreWithDB(key, typ, nil)
 }
 
 // LoadLatestVersion loads the latest application version. It will panic if
 // called more than once on a running BaseApp.
-func (app *BaseApp) LoadLatestVersion(baseKey *sdk.KVStoreKey) error {
-	err := app.cms.LoadLatestVersion()
+func (app *BaseApp) LoadLatestVersion(group int32, baseKey *sdk.KVStoreKey) error {
+	if _, ok := app.cms[group]; !ok {
+		return errors.New("Invalid group.")
+	}
+
+	err := app.cms[group].LoadLatestVersion(group)
 	if err != nil {
 		return err
 	}
-	return app.initFromMainStore(baseKey)
+	return app.initFromMainStore(group, baseKey)
 }
 
 // LoadVersion loads the BaseApp application version. It will panic if called
 // more than once on a running baseapp.
-func (app *BaseApp) LoadVersion(version int64, baseKey *sdk.KVStoreKey) error {
-	err := app.cms.LoadVersion(version)
+func (app *BaseApp) LoadVersion(group int32, version int64, baseKey *sdk.KVStoreKey) error {
+	if _, ok := app.cms[group]; !ok {
+		return errors.New("Invalid group.")
+	}
+
+	err := app.cms[group].LoadVersion(group, version)
 	if err != nil {
 		return err
 	}
-	return app.initFromMainStore(baseKey)
+	return app.initFromMainStore(group, baseKey)
 }
 
 // LastCommitID returns the last CommitID of the multistore.
-func (app *BaseApp) LastCommitID() sdk.CommitID {
-	return app.cms.LastCommitID()
+func (app *BaseApp) LastCommitID() map[int32]sdk.CommitID {
+	commits := make(map[int32]sdk.CommitID)
+	for key, item := range app.cms {
+		commits[key] = item.LastCommitID()
+	}
+	return commits
 }
 
 // LastBlockHeight returns the last committed block height.
-func (app *BaseApp) LastBlockHeight() int64 {
-	return app.cms.LastCommitID().Version
+func (app *BaseApp) LastBlockHeight(group int32) int64 {
+	if _, ok := app.cms[group]; !ok {
+		return -1
+	}
+	return app.cms[group].LastCommitID().Version
 }
 
 // initializes the remaining logic from app.cms
-func (app *BaseApp) initFromMainStore(baseKey *sdk.KVStoreKey) error {
-	mainStore := app.cms.GetKVStore(baseKey)
+func (app *BaseApp) initFromMainStore(group int32, baseKey *sdk.KVStoreKey) error {
+	mainStore := app.cms[group].GetKVStore(baseKey)
 	if mainStore == nil {
 		return errors.New("baseapp expects MultiStore with 'main' KVStore")
 	}
 
 	// memoize baseKey
-	if app.baseKey != nil {
+	if app.baseKey == nil {
+		app.baseKey = make(map[int32]*sdk.KVStoreKey)
+	}
+	if _, ok := app.baseKey[group]; ok {
 		panic("app.baseKey expected to be nil; duplicate init?")
 	}
-	app.baseKey = baseKey
+	app.baseKey[group] = baseKey
 
 	// Load the consensus params from the main store. If the consensus params are
 	// nil, it will be saved later during InitChain.
@@ -220,6 +258,7 @@ func (app *BaseApp) initFromMainStore(baseKey *sdk.KVStoreKey) error {
 	}
 
 	// needed for `gaiad export`, which inits from store but never calls initchain
+	// can not use header.group.
 	app.setCheckState(abci.Header{})
 	app.Seal()
 
@@ -253,10 +292,16 @@ func (app *BaseApp) IsSealed() bool { return app.sealed }
 // the context wrapping it.
 // It is called by InitChain() and Commit()
 func (app *BaseApp) setCheckState(header abci.Header) {
-	ms := app.cms.CacheMultiStore()
-	app.checkState = &state{
-		ms:  ms,
-		ctx: sdk.NewContext(ms, header, true, app.logger).WithMinGasPrices(app.minGasPrices),
+	if app.checkState == nil {
+		app.checkState = make(map[int32]*state)
+	}
+
+	for key, _ := range app.cms {
+		header.Group = key
+		app.checkState[key] = &state{
+			ms:  app.cms[key].CacheMultiStore(),
+			ctx: sdk.NewContext(app.cms[key], key, header, true, app.logger),
+		}
 	}
 }
 
@@ -265,10 +310,16 @@ func (app *BaseApp) setCheckState(header abci.Header) {
 // It is called by InitChain() and BeginBlock(),
 // and deliverState is set nil on Commit().
 func (app *BaseApp) setDeliverState(header abci.Header) {
-	ms := app.cms.CacheMultiStore()
-	app.deliverState = &state{
-		ms:  ms,
-		ctx: sdk.NewContext(ms, header, false, app.logger),
+	if app.deliverState == nil {
+		app.deliverState = make(map[int32]*state)
+	}
+
+	for key, _ := range app.cms {
+		header.Group = key
+		app.deliverState[key] = &state{
+			ms:  app.cms[key].CacheMultiStore(),
+			ctx: sdk.NewContext(app.cms[key], key, header, false, app.logger),
+		}
 	}
 }
 
@@ -283,7 +334,7 @@ func (app *BaseApp) storeConsensusParams(consensusParams *abci.ConsensusParams) 
 	if err != nil {
 		panic(err)
 	}
-	mainStore := app.cms.GetKVStore(app.baseKey)
+	mainStore := app.cms[0].GetKVStore(app.baseKey[0])
 	mainStore.Set(mainConsensusParamsKey, consensusParamsBz)
 }
 
@@ -298,14 +349,15 @@ func (app *BaseApp) getMaximumBlockGas() (maxGas uint64) {
 // ----------------------------------------------------------------------------
 // ABCI
 
-// Info implements the ABCI interface.
+// Info implements the ABCI interface. Just return the main group state
 func (app *BaseApp) Info(req abci.RequestInfo) abci.ResponseInfo {
-	lastCommitID := app.cms.LastCommitID()
-
+	fmt.Println("test inforr___")
+	fmt.Println(fmt.Sprintf("%X", app.cms[0].LastCommitID().Hash))
+	fmt.Println(fmt.Sprintf("%X", app.cms[2].LastCommitID().Hash))
 	return abci.ResponseInfo{
 		Data:             app.name,
-		LastBlockHeight:  lastCommitID.Version,
-		LastBlockAppHash: lastCommitID.Hash,
+		LastBlockHeight:  app.cms[0].LastCommitID().Version,
+		LastBlockAppHash: app.cms[0].LastCommitID().Hash,
 	}
 }
 
@@ -326,18 +378,24 @@ func (app *BaseApp) InitChain(req abci.RequestInitChain) (res abci.ResponseInitC
 	}
 
 	// initialize the deliver state and check state with ChainID and run initChain
-	app.setDeliverState(abci.Header{ChainID: req.ChainId})
-	app.setCheckState(abci.Header{ChainID: req.ChainId})
+	app.setDeliverState(abci.Header{ChainID: req.ChainId, Group: 0})
+	app.setCheckState(abci.Header{ChainID: req.ChainId, Group: 0})
+	for key, _ := range app.cms {
+		app.deliverState[key].ctx = app.deliverState[key].ctx.
+			WithBlockGasMeter(sdk.NewInfiniteGasMeter())
+	}
 
 	if app.initChainer == nil {
 		return
 	}
 
 	// add block gas meter for any genesis transactions (allow infinite gas)
-	app.deliverState.ctx = app.deliverState.ctx.
-		WithBlockGasMeter(sdk.NewInfiniteGasMeter())
 
-	res = app.initChainer(app.deliverState.ctx, req)
+	ctxs := make(map[int32]sdk.Context)
+	for key, item := range app.deliverState {
+		ctxs[key] = item.ctx
+	}
+	res = app.initChainer(ctxs, req)
 
 	// NOTE: We don't commit, but BeginBlock for block 1 starts from this
 	// deliverState.
@@ -437,8 +495,11 @@ func handleQueryApp(app *BaseApp, path []string, req abci.RequestQuery) (res abc
 }
 
 func handleQueryStore(app *BaseApp, path []string, req abci.RequestQuery) (res abci.ResponseQuery) {
+	if _, ok := app.cms[req.Group]; !ok {
+		return sdk.ErrUnknownRequest("Invalid group").QueryResult()
+	}
 	// "/store" prefix for store queries
-	queryable, ok := app.cms.(sdk.Queryable)
+	queryable, ok := app.cms[req.Group].(sdk.Queryable)
 	if !ok {
 		msg := "multistore doesn't support queries"
 		return sdk.ErrUnknownRequest(msg).QueryResult()
@@ -471,6 +532,9 @@ func handleQueryP2P(app *BaseApp, path []string, _ abci.RequestQuery) (res abci.
 }
 
 func handleQueryCustom(app *BaseApp, path []string, req abci.RequestQuery) (res abci.ResponseQuery) {
+	if _, ok := app.cms[req.Group]; !ok {
+		return sdk.ErrUnknownRequest("Invalid group").QueryResult()
+	}
 	// path[0] should be "custom" because "/custom" prefix is required for keeper
 	// queries.
 	//
@@ -486,9 +550,7 @@ func handleQueryCustom(app *BaseApp, path []string, req abci.RequestQuery) (res 
 	}
 
 	// cache wrap the commit-multistore for safety
-	ctx := sdk.NewContext(
-		app.cms.CacheMultiStore(), app.checkState.ctx.BlockHeader(), true, app.logger,
-	).WithMinGasPrices(app.minGasPrices)
+	ctx := sdk.NewContext(app.cms[req.Group].CacheMultiStore(), req.Group, app.checkState[req.Group].ctx.BlockHeader(), true, app.logger).WithMinGasPrices(app.minGasPrices)
 
 	// Passes the rest of the path as an argument to the querier.
 	//
@@ -511,10 +573,24 @@ func handleQueryCustom(app *BaseApp, path []string, req abci.RequestQuery) (res 
 
 // BeginBlock implements the ABCI application interface.
 func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeginBlock) {
-	if app.cms.TracingEnabled() {
-		app.cms.SetTracingContext(sdk.TraceContext(
-			map[string]interface{}{"blockHeight": req.Header.Height},
+	group := req.Header.Group
+	isGroup := true
+	if _, ok := app.cms[group]; !ok {
+		isGroup = false
+	}
+
+	if app.cms[0].TracingEnabled() {
+		app.cms[0].SetTracingContext(sdk.TraceContext(
+			map[string]interface{}{"blockHeight": req.Header.Height, "group": 0},
 		))
+	}
+
+	if group != 0 && isGroup {
+		if app.cms[group].TracingEnabled() {
+			app.cms[group].SetTracingContext(sdk.TraceContext(
+				map[string]interface{}{"blockHeight": req.Header.Height, "group": group},
+			))
+		}
 	}
 
 	// Initialize the DeliverTx state. If this is the first block, it should
@@ -525,9 +601,11 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 	} else {
 		// In the first block, app.deliverState.ctx will already be initialized
 		// by InitChain. Context is now updated with Header information.
-		app.deliverState.ctx = app.deliverState.ctx.
-			WithBlockHeader(req.Header).
-			WithBlockHeight(req.Header.Height)
+		for key := range app.cms {
+			app.deliverState[key].ctx = app.deliverState[key].ctx.
+				WithBlockHeader(req.Header).
+				WithBlockHeight(req.Header.Height)
+		}
 	}
 
 	// add block gas meter
@@ -538,10 +616,14 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 		gasMeter = sdk.NewInfiniteGasMeter()
 	}
 
-	app.deliverState.ctx = app.deliverState.ctx.WithBlockGasMeter(gasMeter)
+	app.deliverState[0].ctx = app.deliverState[0].ctx.WithBlockGasMeter(gasMeter)
 
 	if app.beginBlocker != nil {
-		res = app.beginBlocker(app.deliverState.ctx, req)
+		res = app.beginBlocker(app.deliverState[0].ctx, req)
+		// if group != 0 && isGroup {
+		// 	res2 := app.beginBlocker(app.deliverState[group].ctx, req)
+		// 	res.Tags = append(res.Tags, res2.Tags...)
+		// }
 	}
 
 	// set the signed validators for addition to context in deliverTx
@@ -615,8 +697,8 @@ func validateBasicTxMsgs(msgs []sdk.Msg) sdk.Error {
 }
 
 // retrieve the context for the tx w/ txBytes and other memoized values.
-func (app *BaseApp) getContextForTx(mode runTxMode, txBytes []byte) (ctx sdk.Context) {
-	ctx = app.getState(mode).ctx.
+func (app *BaseApp) getContextForTx(mode runTxMode, txBytes []byte, group int32) (ctx sdk.Context) {
+	ctx = app.getState(mode, group).ctx.
 		WithTxBytes(txBytes).
 		WithVoteInfos(app.voteInfos).
 		WithConsensusParams(app.consensusParams)
@@ -696,12 +778,12 @@ func (app *BaseApp) runMsgs(ctx sdk.Context, msgs []sdk.Msg, mode runTxMode) (re
 
 // Returns the applicantion's deliverState if app is in runTxModeDeliver,
 // otherwise it returns the application's checkstate.
-func (app *BaseApp) getState(mode runTxMode) *state {
+func (app *BaseApp) getState(mode runTxMode, group int32) *state {
 	if mode == runTxModeCheck || mode == runTxModeSimulate {
-		return app.checkState
+		return app.checkState[group]
 	}
 
-	return app.deliverState
+	return app.deliverState[group]
 }
 
 // cacheTxContext returns a new context based off of the provided context with
@@ -722,7 +804,7 @@ func (app *BaseApp) cacheTxContext(ctx sdk.Context, txBytes []byte) (
 		).(sdk.CacheMultiStore)
 	}
 
-	return ctx.WithMultiStore(msCache), msCache
+	return ctx.WithMultiStore(ctx.BlockHeader().Group, msCache), msCache
 }
 
 // runTx processes a transaction. The transactions is proccessed via an
@@ -734,19 +816,27 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 	// determined by the GasMeter. We need access to the context to get the gas
 	// meter so we initialize upfront.
 	var gasWanted uint64
+	group := tx.GetMsgs()[0].Group()
+	isGroup := true
+	if _, ok := app.cms[group]; !ok {
+		isGroup = false
+	}
 
-	ctx := app.getContextForTx(mode, txBytes)
-	ms := ctx.MultiStore()
+	var ctx0 sdk.Context
+	var ms0 sdk.MultiStore
+
+	ctx0 = app.getContextForTx(mode, txBytes, 0)
+	ms0 = ctx0.MultiStore()
 
 	// only run the tx if there is block gas remaining
-	if mode == runTxModeDeliver && ctx.BlockGasMeter().IsOutOfGas() {
+	if mode == runTxModeDeliver && ctx0.BlockGasMeter().IsOutOfGas() {
 		result = sdk.ErrOutOfGas("no block gas left to run tx").Result()
 		return
 	}
 
 	var startingGas uint64
 	if mode == runTxModeDeliver {
-		startingGas = ctx.BlockGasMeter().GasConsumed()
+		startingGas = ctx0.BlockGasMeter().GasConsumed()
 	}
 
 	defer func() {
@@ -755,7 +845,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 			case sdk.ErrorOutOfGas:
 				log := fmt.Sprintf(
 					"out of gas in location: %v; gasWanted: %d, gasUsed: %d",
-					rType.Descriptor, gasWanted, ctx.GasMeter().GasConsumed(),
+					rType.Descriptor, gasWanted, ctx0.GasMeter().GasConsumed(),
 				)
 				result = sdk.ErrOutOfGas(log).Result()
 			default:
@@ -765,7 +855,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 		}
 
 		result.GasWanted = gasWanted
-		result.GasUsed = ctx.GasMeter().GasConsumed()
+		result.GasUsed = ctx0.GasMeter().GasConsumed()
 	}()
 
 	// If BlockGasMeter() panics it will be caught by the above recover and will
@@ -775,12 +865,12 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 	// to recover from this one.
 	defer func() {
 		if mode == runTxModeDeliver {
-			ctx.BlockGasMeter().ConsumeGas(
-				ctx.GasMeter().GasConsumedToLimit(),
+			ctx0.BlockGasMeter().ConsumeGas(
+				ctx0.GasMeter().GasConsumedToLimit(),
 				"block gas meter",
 			)
 
-			if ctx.BlockGasMeter().GasConsumed() < startingGas {
+			if ctx0.BlockGasMeter().GasConsumed() < startingGas {
 				panic(sdk.ErrorGasOverflow{Descriptor: "tx gas summation"})
 			}
 		}
@@ -792,8 +882,8 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 	}
 
 	if app.anteHandler != nil {
-		var anteCtx sdk.Context
-		var msCache sdk.CacheMultiStore
+		var anteCtx0 sdk.Context
+		var msCache0 sdk.CacheMultiStore
 
 		// Cache wrap context before anteHandler call in case it aborts.
 		// This is required for both CheckTx and DeliverTx.
@@ -802,9 +892,9 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 		// NOTE: Alternatively, we could require that anteHandler ensures that
 		// writes do not happen if aborted/failed.  This may have some
 		// performance benefits, but it'll be more difficult to get right.
-		anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
+		anteCtx0, msCache0 = app.cacheTxContext(ctx0, txBytes)
 
-		newCtx, result, abort := app.anteHandler(anteCtx, tx, (mode == runTxModeSimulate))
+		newCtx, result, abort := app.anteHandler(anteCtx0, tx, (mode == runTxModeSimulate))
 		if !newCtx.IsZero() {
 			// At this point, newCtx.MultiStore() is cache-wrapped, or something else
 			// replaced by the ante handler. We want the original multistore, not one
@@ -813,7 +903,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 			// Also, in the case of the tx aborting, we need to track gas consumed via
 			// the instantiated gas meter in the ante handler, so we update the context
 			// prior to returning.
-			ctx = newCtx.WithMultiStore(ms)
+			ctx0 = newCtx.WithMultiStore(0, ms0)
 		}
 
 		gasWanted = result.GasWanted
@@ -822,7 +912,7 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 			return result
 		}
 
-		msCache.Write()
+		msCache0.Write()
 	}
 
 	if mode == runTxModeCheck {
@@ -831,17 +921,26 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 
 	// Create a new context based off of the existing context with a cache wrapped
 	// multi-store in case message processing fails.
-	runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
-	result = app.runMsgs(runMsgCtx, msgs, mode)
-	result.GasWanted = gasWanted
+	if isGroup {
+		var ctx sdk.Context
 
-	if mode == runTxModeSimulate {
-		return
-	}
+		if group != 0 {
+			ctx = app.getContextForTx(mode, txBytes, group)
+		} else {
+			ctx = ctx0
+		}
+		runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
+		result = app.runMsgs(runMsgCtx, msgs, mode)
+		result.GasWanted = gasWanted
 
-	// only update state if all messages pass
-	if result.IsOK() {
-		msCache.Write()
+		if mode == runTxModeSimulate {
+			return
+		}
+
+		// only update state if all messages pass
+		if result.IsOK() {
+			msCache.Write()
+		}
 	}
 
 	return
@@ -849,12 +948,23 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte, tx sdk.Tx) (result sdk
 
 // EndBlock implements the ABCI interface.
 func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBlock) {
-	if app.deliverState.ms.TracingEnabled() {
-		app.deliverState.ms = app.deliverState.ms.SetTracingContext(nil).(sdk.CacheMultiStore)
+	if app.deliverState[0].ms.TracingEnabled() {
+		app.deliverState[0].ms = app.deliverState[0].ms.SetTracingContext(nil).(sdk.CacheMultiStore)
+	}
+	isGroup := true
+	if _, ok := app.cms[req.Group]; !ok {
+		isGroup = false
+	}
+	if req.Group != 0 && isGroup && app.deliverState[req.Group].ms.TracingEnabled() {
+		app.deliverState[req.Group].ms = app.deliverState[req.Group].ms.SetTracingContext(nil).(sdk.CacheMultiStore)
 	}
 
 	if app.endBlocker != nil {
-		res = app.endBlocker(app.deliverState.ctx, req)
+		res = app.endBlocker(app.deliverState[0].ctx, req)
+		// if req.Group != 0 && isGroup {
+		// 	res2 := app.endBlocker(app.deliverState[req.Group].ctx, req)
+		// 	res.Tags = append(res.Tags, res2.Tags...)
+		// }
 	}
 
 	return
@@ -862,13 +972,30 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 
 // Commit implements the ABCI interface.
 func (app *BaseApp) Commit() (res abci.ResponseCommit) {
-	header := app.deliverState.ctx.BlockHeader()
+	var buffer bytes.Buffer
+	var header abci.Header
+	var hash []byte
+	var keys []int
+	for key := range app.deliverState {
+		keys = append(keys, (int)(key))
+	}
+	sort.Ints(keys)
+	for _, key := range keys {
+		k := (int32)(key)
+		header = app.deliverState[k].ctx.BlockHeader()
 
-	// write the Deliver state and commit the MultiStore
-	app.deliverState.ms.Write()
-	commitID := app.cms.Commit()
-	app.logger.Debug("Commit synced", "commit", fmt.Sprintf("%X", commitID))
+		// write the Deliver state and commit the MultiStore
+		app.deliverState[k].ms.Write()
 
+		commitID := app.cms[k].Commit(k)
+		if key == 0 {
+			hash = commitID.Hash
+		}
+
+		app.logger.Debug("Commit synced", "commit", fmt.Sprintf("%X,%d", commitID, key))
+		buffer.Write(commitID.Hash)
+
+	}
 	// Reset the Check state to the latest committed.
 	//
 	// NOTE: safe because Tendermint holds a lock on the mempool for Commit.
@@ -879,7 +1006,7 @@ func (app *BaseApp) Commit() (res abci.ResponseCommit) {
 	app.deliverState = nil
 
 	return abci.ResponseCommit{
-		Data: commitID.Hash,
+		Data: hash,
 	}
 }
 

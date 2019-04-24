@@ -55,7 +55,7 @@ func NewApp() *App {
 
 	// Create your application object
 	app := &App{
-		BaseApp:          bam.NewBaseApp("mock", logger, db, auth.DefaultTxDecoder(cdc)),
+		BaseApp:          bam.NewBaseApp("mock", logger, db, 0, auth.DefaultTxDecoder(cdc)),
 		Cdc:              cdc,
 		KeyMain:          sdk.NewKVStoreKey(bam.MainStoreKey),
 		KeyAccount:       sdk.NewKVStoreKey(auth.StoreKey),
@@ -100,30 +100,30 @@ func (app *App) CompleteSetup(newKeys ...sdk.StoreKey) error {
 	for _, key := range newKeys {
 		switch key.(type) {
 		case *sdk.KVStoreKey:
-			app.MountStore(key, sdk.StoreTypeIAVL)
+			app.MountStore(0, key, sdk.StoreTypeIAVL)
 		case *sdk.TransientStoreKey:
-			app.MountStore(key, sdk.StoreTypeTransient)
+			app.MountStore(0, key, sdk.StoreTypeTransient)
 		default:
 			return fmt.Errorf("unsupported StoreKey: %+v", key)
 		}
 	}
 
-	err := app.LoadLatestVersion(app.KeyMain)
+	err := app.LoadLatestVersion(0, app.KeyMain)
 
 	return err
 }
 
 // InitChainer performs custom logic for initialization.
 // nolint: errcheck
-func (app *App) InitChainer(ctx sdk.Context, _ abci.RequestInitChain) abci.ResponseInitChain {
+func (app *App) InitChainer(ctx map[int32]sdk.Context, _ abci.RequestInitChain) abci.ResponseInitChain {
 	// Load the genesis accounts
 	for _, genacc := range app.GenesisAccounts {
-		acc := app.AccountKeeper.NewAccountWithAddress(ctx, genacc.GetAddress())
+		acc := app.AccountKeeper.NewAccountWithAddress(ctx[0], genacc.GetAddress())
 		acc.SetCoins(genacc.GetCoins())
-		app.AccountKeeper.SetAccount(ctx, acc)
+		app.AccountKeeper.SetAccount(ctx[0], acc)
 	}
 
-	auth.InitGenesis(ctx, app.AccountKeeper, app.FeeCollectionKeeper, auth.DefaultGenesisState())
+	auth.InitGenesis(ctx[0], app.AccountKeeper, app.FeeCollectionKeeper, auth.DefaultGenesisState())
 
 	return abci.ResponseInitChain{}
 }

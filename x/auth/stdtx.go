@@ -28,13 +28,14 @@ type StdTx struct {
 }
 
 func NewStdTx(msgs []sdk.Msg, fee StdFee, sigs []StdSignature, memo string, cert []byte) StdTx {
-	return StdTx{
+	ret := StdTx{
 		Msgs:       msgs,
 		Fee:        fee,
 		Signatures: sigs,
 		Memo:       memo,
 		//Cert:       cert,
 	}
+	return ret
 }
 
 // GetMsgs returns the all the transaction's messages.
@@ -174,13 +175,14 @@ func StdSignBytes(chainID string, accnum uint64, sequence uint64, fee StdFee, ms
 	for _, msg := range msgs {
 		msgsBytes = append(msgsBytes, json.RawMessage(msg.GetSignBytes()))
 	}
+
 	bz, err := msgCdc.MarshalJSON(StdSignDoc{
 		AccountNumber: accnum,
 		ChainID:       chainID,
 		Fee:           json.RawMessage(fee.Bytes()),
 		Memo:          memo,
 		Msgs:          msgsBytes,
-		Sequence:      sequence,
+		//Sequence:      sequence,
 	})
 	if err != nil {
 		panic(err)

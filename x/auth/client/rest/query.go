@@ -48,7 +48,7 @@ func QueryAccountRequestHandlerFn(
 			return
 		}
 
-		res, err := cliCtx.QueryStore(auth.AddressStoreKey(addr), storeName)
+		res, err := cliCtx.QueryStore(0, auth.AddressStoreKey(addr), storeName)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -87,7 +87,7 @@ func QueryBalancesRequestHandlerFn(
 			return
 		}
 
-		res, err := cliCtx.QueryStore(auth.AddressStoreKey(addr), storeName)
+		res, err := cliCtx.QueryStore(0, auth.AddressStoreKey(addr), storeName)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return

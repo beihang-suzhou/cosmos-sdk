@@ -57,7 +57,7 @@ func main() {
 	}
 }
 
-func newApp(logger log.Logger, db dbm.DB, traceStore io.Writer) abci.Application {
+func newApp(logger log.Logger, db dbm.DB, group int32, traceStore io.Writer) abci.Application {
 	return app.NewGaiaApp(
 		logger, db, traceStore, true,
 		baseapp.SetPruning(store.NewPruningOptionsFromString(viper.GetString("pruning"))),

@@ -15,7 +15,11 @@ import (
 
 // SetPruning sets a pruning option on the multistore associated with the app
 func SetPruning(opts sdk.PruningOptions) func(*BaseApp) {
-	return func(bap *BaseApp) { bap.cms.SetPruning(opts) }
+	return func(bap *BaseApp) {
+		for _, item := range bap.cms {
+			item.SetPruning(opts)
+		}
+	}
 }
 
 // SetMinGasPrices returns an option that sets the minimum gas prices on the app.
@@ -46,7 +50,7 @@ func (app *BaseApp) SetCMS(cms store.CommitMultiStore) {
 	if app.sealed {
 		panic("SetEndBlocker() on sealed BaseApp")
 	}
-	app.cms = cms
+	app.cms[0] = cms
 }
 
 func (app *BaseApp) SetInitChainer(initChainer sdk.InitChainer) {

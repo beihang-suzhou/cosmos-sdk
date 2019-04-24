@@ -39,7 +39,7 @@ func signingInfoHandlerFn(cliCtx context.CLIContext, storeName string, cdc *code
 
 		key := slashing.GetValidatorSigningInfoKey(sdk.ConsAddress(pk.Address()))
 
-		res, err := cliCtx.QueryStore(key, storeName)
+		res, err := cliCtx.QueryStore(0, key, storeName)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -66,7 +66,7 @@ func queryParamsHandlerFn(cdc *codec.Codec, cliCtx context.CLIContext) http.Hand
 	return func(w http.ResponseWriter, r *http.Request) {
 		route := fmt.Sprintf("custom/%s/parameters", slashing.QuerierRoute)
 
-		res, err := cliCtx.QueryWithData(route, nil)
+		res, err := cliCtx.QueryWithData(0, route, nil)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return

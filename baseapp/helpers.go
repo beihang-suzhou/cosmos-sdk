@@ -29,9 +29,9 @@ func (app *BaseApp) Deliver(tx sdk.Tx) (result sdk.Result) {
 // used by tests
 func (app *BaseApp) NewContext(isCheckTx bool, header abci.Header) sdk.Context {
 	if isCheckTx {
-		return sdk.NewContext(app.checkState.ms, header, true, app.logger).
+		return sdk.NewContext(app.checkState[header.Group].ms, 0, header, true, app.logger).
 			WithMinGasPrices(app.minGasPrices)
 	}
 
-	return sdk.NewContext(app.deliverState.ms, header, false, app.logger)
+	return sdk.NewContext(app.deliverState[header.Group].ms, 0, header, false, app.logger)
 }

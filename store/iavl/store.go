@@ -69,7 +69,7 @@ func UnsafeNewStore(tree *iavl.MutableTree, numRecent int64, storeEvery int64) *
 }
 
 // Implements Committer.
-func (st *Store) Commit() types.CommitID {
+func (st *Store) Commit(group int32) types.CommitID {
 	// Save a new version.
 	hash, version, err := st.tree.SaveVersion()
 	if err != nil {
