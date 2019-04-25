@@ -49,6 +49,35 @@ func QueryTxCmd(cdc *codec.Codec) *cobra.Command {
 	return cmd
 }
 
+func QueryTx(cdc *codec.Codec, cliCtx context.CLIContext, hashHexStr string) (out sdk.TxResponse, err error) {
+	hash, err := hex.DecodeString(hashHexStr)
+	if err != nil {
+		return out, err
+	}
+
+	node, err := cliCtx.GetNode()
+	if err != nil {
+		return out, err
+	}
+
+	res, err := node.Tx(hash, !cliCtx.TrustNode)
+	if err != nil {
+		return out, err
+	}
+
+	if !cliCtx.TrustNode {
+		if err = ValidateTxResult(cliCtx, res); err != nil {
+			return out, err
+		}
+	}
+
+	if out, err = formatTxResult(cdc, res); err != nil {
+		return out, err
+	}
+
+	return out, nil
+}
+
 func queryTx(cdc *codec.Codec, cliCtx context.CLIContext, hashHexStr string) (out sdk.TxResponse, err error) {
 	hash, err := hex.DecodeString(hashHexStr)
 	if err != nil {

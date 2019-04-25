@@ -151,6 +151,52 @@ func SearchTxs(cliCtx context.CLIContext, cdc *codec.Codec, tags []string, page,
 	return info, nil
 }
 
+func SearchTxs_BS(cliCtx context.CLIContext, cdc *codec.Codec, tags []string, page, limit int) ([]sdk.TxResponse, error) {
+	if len(tags) == 0 {
+		return nil, errors.New("must declare at least one tag to search")
+	}
+
+	if page <= 0 {
+		return nil, errors.New("page must greater than 0")
+	}
+
+	if limit <= 0 {
+		return nil, errors.New("limit must greater than 0")
+	}
+
+	// XXX: implement ANY
+	query := strings.Join(tags, " AND ")
+
+	// get the node
+	node, err := cliCtx.GetNode()
+	if err != nil {
+		return nil, err
+	}
+
+	prove := !cliCtx.TrustNode
+
+	res, err := node.TxSearch_BS(query, prove, page, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	if prove {
+		for _, tx := range res.Txs {
+			err := ValidateTxResult(cliCtx, tx)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	info, err := FormatTxResults(cdc, res.Txs)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
 // parse the indexed txs into an array of Info
 func FormatTxResults(cdc *codec.Codec, res []*ctypes.ResultTx) ([]sdk.TxResponse, error) {
 	var err error
